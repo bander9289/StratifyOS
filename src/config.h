@@ -6,9 +6,9 @@
 #include "mcu/debug.h"
 
 #if MCU_DEBUG
-#define VERSION "3.8.0db"
+#define SOS_SYS_VERSION "3.8.0db"
 #else
-#define VERSION "3.8.0b"
+#define SOS_SYS_VERSION "3.8.0b"
 #endif
 
 #define BCD_VERSION 0x380

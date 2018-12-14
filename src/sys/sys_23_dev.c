@@ -47,7 +47,7 @@ int sys_23_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 		break;
 	case I_SYS_23_GETINFO:
 		memset(sys, 0, sizeof(sys_23_info_t));
-		strncpy(sys->version, VERSION, 7);
+		strncpy(sys->version, SOS_SYS_VERSION, 7);
 		strncpy(sys->sys_version, sos_board_config.sys_version, 7);
 		strncpy(sys->arch, ARCH, 7);
 		sys->security = 0;

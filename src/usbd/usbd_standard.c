@@ -27,6 +27,8 @@
 
 #define USBD_EP_MASK (USBD_ENDPOINT_ADDRESS_IN|(mcu_config.usb_logical_endpoint_count-1))
 
+extern char htoc(int nibble);
+
 static int usb_dev_decode_ep(usbd_control_t * context, int ep){
     MCU_UNUSED_ARGUMENT(context);
 	if ( ep & USBD_ENDPOINT_ADDRESS_IN ){
@@ -62,14 +64,6 @@ static void usbd_control_get_serialno(void * dest){
 }
 
 
-
-char htoc(int nibble){
-	if ( nibble >= 0 && nibble < 10 ){
-        return (char)nibble + '0';
-	} else {
-        return (char)nibble + 'A' - 10;
-	}
-}
 
 int usbd_standard_request_handle_setup(usbd_control_t * context){
 	switch (context->setup_packet.bRequest) {

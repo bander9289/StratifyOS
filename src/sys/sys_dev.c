@@ -57,7 +57,7 @@ int sys_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 	switch(request){
 		case  I_SYS_GETINFO:
 			memset(info, 0, sizeof(sys_info_t));
-			strncpy(info->kernel_version, VERSION, 7);
+			strncpy(info->kernel_version, SOS_SYS_VERSION, 7);
 			strncpy(info->sys_version, sos_board_config.sys_version, 7);
 			strncpy(info->arch, ARCH, 15);
 			info->security = 0;

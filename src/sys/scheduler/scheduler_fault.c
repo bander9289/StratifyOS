@@ -91,3 +91,12 @@ void htoa(char * dest, int num){
 	}
 	dest[8] = 0;
 }
+
+char htoc(int nibble){
+	if ( nibble >= 0 && nibble < 10 ){
+        return (char)nibble + '0';
+	} else {
+        return (char)nibble + 'A' - 10;
+	}
+}
+
