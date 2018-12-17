@@ -51,7 +51,13 @@
 #include "arch/stm32/stm32_arch.h"
 #define ARCH_DEFINED
 #elif (defined __MIMXRT1052CVJ5B)
-#include "arch/imxrt/imxrt_arch.h"
+#define ARCH "v7em"
+#define __CHECK_DEVICE_DEFINES
+#define ARM_MATH_CM7 1
+#define __CM7_REV 1
+#include "imxrt_arch.h"
+#undef __FPU_USED
+#define ARCH_DEFINED
 #else
 
 typedef enum IRQn
