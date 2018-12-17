@@ -141,7 +141,7 @@ int task_init(int interval,
 int set_systick_interval(int interval){
 	u32 reload;
 	int core_tick_freq;
-	reload = (mcu_board_config.core_cpu_freq * interval + 500) / 1000;
+	reload = ((float)mcu_board_config.core_cpu_freq * interval + 500) / 1000;
 	if ( reload > (0x00FFFFFF) ){
 		reload = (0x00FFFFFF);
 	} else if ( reload < SYSTICK_MIN_CYCLES ){
