@@ -56,7 +56,6 @@
 #define ARM_MATH_CM7 1
 #define __CM7_REV 1
 #include "imxrt_arch.h"
-#undef __FPU_USED
 #define ARCH_DEFINED
 #else
 
