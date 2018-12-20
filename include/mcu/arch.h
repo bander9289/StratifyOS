@@ -30,6 +30,9 @@
 
 #define SCHED_USECOND_TMR_RESET_OC 0
 #define SCHED_USECOND_TMR_SLEEP_OC 1
+#define SCHED_USECOND_TMR_SYSTEM_TIMER_OC 2
+#define SCHED_USECOND_TMR_MINIMUM_PROCESS_TIMER_INTERVAL 100
+
 #define PTHREAD_DEFAULT_STACK_SIZE 1536
 #define MALLOC_CHUNK_SIZE 64
 #define MALLOC_SBRK_JUMP_SIZE 128
@@ -50,7 +53,7 @@
 #undef __FPU_USED
 #include "arch/stm32/stm32_arch.h"
 #define ARCH_DEFINED
-#elif (defined __MIMXRT1052CVJ5B)
+#elif (defined __imxrt1052)
 #define ARCH "v7em"
 #define __CHECK_DEVICE_DEFINES
 #define ARM_MATH_CM7 1
