@@ -58,7 +58,7 @@
 #define __CHECK_DEVICE_DEFINES
 #define ARM_MATH_CM7 1
 #define __CM7_REV 1
-#include "imxrt_arch.h"
+#include "arch/imxrt/imxrt_arch.h"
 #define ARCH_DEFINED
 #else
 
