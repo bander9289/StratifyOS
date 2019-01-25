@@ -6,8 +6,6 @@ MEMORY {
    kernel : ORIGIN = 0xDEFF8000, LENGTH = 32K
 }
 
-__ram_size__ = 32K;
-
 SECTIONS {
 
   . = 0;
@@ -32,10 +30,10 @@ SECTIONS {
          *(.glue_7t)
          *(.text.*)
          KEEP(*(_binary___*))
-         
          FILL(0xFF);
          
-   } >flash
+	 } > flash
+
    
   .ARM.extab : 
   {
