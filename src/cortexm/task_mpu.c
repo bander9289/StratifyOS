@@ -216,7 +216,7 @@ int task_mpu_calc_protection(task_memories_t * mem){
 	uint32_t rasr;
 	uint32_t rbar;
 
-	if ( mem->code.addr < (void*)&_data ){
+	if ( mem->code.addr < (void*)&_data ){ //FIXME: assumption that code (0x60040000) is below _data (all of RT internal ram)
 		mem_type = MPU_MEMORY_FLASH;
 	} else {
 		mem_type = MPU_MEMORY_SRAM;
