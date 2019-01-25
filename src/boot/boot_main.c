@@ -15,9 +15,7 @@
 #include "mcu/debug.h"
 #include "usbd/control.h"
 #include "mcu/boot_debug.h"
-#if 0 // BA: not ready for this yet
 #include "boot_link.h"
-#endif
 #include "boot_config.h"
 
 
@@ -37,7 +35,7 @@ extern u32 _etext;
 const bootloader_api_t mcu_core_bootloader_api = {
 	.code_size = (u32)&_etext,
 	.exec = exec_bootloader,
-	.usbd_control_root_init = NULL, //usbd_control_root_init,
+	.usbd_control_root_init = usbd_control_root_init,
 	.event = boot_event
 };
 
@@ -95,14 +93,14 @@ int boot_main(){
 void run_bootloader(){
 	init_hw();
 
+#if 0 // BA: not ready for this yet
 	led_flash_run_bootloader();
+#endif
 
 	//initialize link and run link update
 	dstr("LINK Start\n");
 
-#if 0 // BA: not ready for this yet
 	boot_link_update((void*)boot_board_config.link_transport_driver);
-#endif
 }
 
 /*! \details This function checks to see if the application should be run
