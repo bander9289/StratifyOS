@@ -73,7 +73,6 @@ char buffer[256];
 int len;
 } mcu_debug_buffer_t;
 
-static void mcu_debug_vlog(u32 o_flags, const char * intro, const char * format, va_list args);
 static void mcu_debug_root_write_uart_svcall(void * args);
 
 int mcu_debug_init(){
