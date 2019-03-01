@@ -24,7 +24,7 @@
  * \ingroup DEV
  *
  * \details The CAN module provides an API for accessing an MCU's CAN hardware peripherals.
- * This is currently not implemented.
+ * Implemented by Cobb Tuning Products LLC
  *
  *
  */
@@ -33,18 +33,40 @@
  * \brief CAN Bus Header File
  */
 
-#ifndef CAN_H_
-#define CAN_H_
+#ifndef MCU_CAN_H_
+#define MCU_CAN_H_
+
+#include "sos/dev/can.h"
+
+#include "sos/fs/devfs.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+int mcu_can_open(const devfs_handle_t * handle) MCU_ROOT_CODE;
+int mcu_can_read(const devfs_handle_t * handle, devfs_async_t * rop) MCU_ROOT_CODE;
+int mcu_can_write(const devfs_handle_t * handle, devfs_async_t * wop) MCU_ROOT_CODE;
+int mcu_can_ioctl(const devfs_handle_t * handle, int request, void * ctl) MCU_ROOT_CODE;
+int mcu_can_close(const devfs_handle_t * handle) MCU_ROOT_CODE;
+
+int mcu_can_addfilter(const devfs_handle_t * handle, void * ctl);
+int mcu_can_removefilter(const devfs_handle_t * handle, void * ctl);
+
+int mcu_can_getinfo(const devfs_handle_t * handle, void * ctl) MCU_ROOT_CODE;
+int mcu_can_setaction(const devfs_handle_t * handle, void * ctl) MCU_ROOT_CODE;
+
+// !! optimized routines with fewer safety checks !!
+int mcu_can_getframe(const devfs_handle_t * handle, int channel, uint8_t *frame);
+int mcu_can_putframe(const devfs_handle_t * handle, const uint32_t tx_id, const uint8_t *frame, uint8_t size);
+int mcu_can_enable_interrupts(const devfs_handle_t * handle);
+int mcu_can_disable_interrupts(const devfs_handle_t * handle);
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* CAN_H_ */
+#endif /* MCU_CAN_H_ */
 
 /*! @} */
 
