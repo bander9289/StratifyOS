@@ -20,6 +20,7 @@
 
 #include "adc.h"
 #include "dac.h"
+#include "can.h"
 #include "core.h"
 #include "eint.h"
 #include "emc.h"

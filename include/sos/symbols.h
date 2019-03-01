@@ -177,6 +177,7 @@ extern u32 __gnu_h2f_ieee();
 #include "mcu/pio.h"
 #include "mcu/qei.h"
 #include "mcu/tmr.h"
+#include "mcu/can.h"
 #include "cortexm/task.h"
 #include "cortexm/cortexm.h"
 #include "arpa/inet.h"
