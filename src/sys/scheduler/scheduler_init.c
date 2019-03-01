@@ -79,7 +79,10 @@ int scheduler_prepare(){
 		mcu_board_execute_event_handler(MCU_BOARD_CONFIG_EVENT_ROOT_FATAL, (void*)"dbgi");
 	}
 
-	mcu_debug_log_info(MCU_DEBUG_SCHEDULER, "MCU Debug start");
+	mcu_debug_log_info(MCU_DEBUG_SYS, "MCU Debug start");
+
+
+	mcu_debug_log_info(MCU_DEBUG_SCHEDULER, "Init Timing");
 
 #if SCHED_USECOND_TMR_SLEEP_OC > -1
 	if ( scheduler_timing_init() ){

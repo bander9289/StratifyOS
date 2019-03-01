@@ -63,7 +63,14 @@ function(sos_sdk_clone_or_pull PROJECT_PATH REPO_URL WORKSPACE_PATH)
 		message(STATUS ${PROJECT_PATH} " does not exist: cloning")
 		sos_sdk_clone(${REPO_URL} ${WORKSPACE_PATH})
 	endif()
+endfunction()
 
+function(sos_sdk_checkout PROJECT_PATH GIT_PATH)
+	execute_process(COMMAND ${SOS_SDK_GIT_EXEC} checkout ${GIT_PATH} WORKING_DIRECTORY ${PROJECT_PATH} OUTPUT_VARIABLE OUTPUT RESULT_VARIABLE RESULT)
+	message(STATUS "git checkout " ${GIT_PATH} " in " ${PROJECT_PATH} "\n" ${OUTPUT})
+	if(RESULT)
+		message(FATAL_ERROR " Failed to checkout " ${PROJECT_PATH} ${GIT_PATH})
+	endif()
 endfunction()
 
 function(sos_sdk_build_app PROJECT_PATH)
@@ -148,17 +155,19 @@ function(sos_sdk_build_lib PROJECT_PATH IS_INSTALL CONFIG)
 endfunction()
 
 function(sos_get_git_hash)
-	if(EXISTS ${CMAKE_SOURCE_DIR}/.git)
 		execute_process(
 			COMMAND git log -1 --format=%h
 			WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
 			OUTPUT_VARIABLE GIT_HASH_OUTPUT_VARIABLE
 			OUTPUT_STRIP_TRAILING_WHITESPACE
+			RESULT_VARIABLE RESULT
 			)
-		set(SOS_GIT_HASH ${GIT_HASH_OUTPUT_VARIABLE} PARENT_SCOPE)
-	else()
-		set(SOS_GIT_HASH "0000000" PARENT_SCOPE)
-	endif()
+
+		if(RESULT)
+			set(SOS_GIT_HASH "0000000" PARENT_SCOPE)
+		else()
+			set(SOS_GIT_HASH ${GIT_HASH_OUTPUT_VARIABLE} PARENT_SCOPE)
+		endif()
 endfunction()
 
 
