@@ -279,7 +279,11 @@ int sysfs_aio_data_transfer_callback(void * context, const mcu_event_t * event){
 	sysfs_aio_suspend_t * p;
     aiocbp->aio_nbytes = aiocbp->async.nbyte;
     aiocbp->async.buf = NULL;
-    aiocbp->async.nbyte = 0;
+	if( aiocbp->async.nbyte < 0 ){
+		aiocbp->async.nbyte = SYSFS_GET_RETURN_ERRNO(aiocbp->async.nbyte);
+	} else {
+		aiocbp->async.nbyte = 0;
+	}
 
 	//Check to see if the thread is suspended on aio -- the block object is a list of aiocb -- check if aiocbp is in list
     tid = aiocbp->async.tid;
