@@ -62,6 +62,13 @@ int mcu_can_putframe(const devfs_handle_t * handle, const uint32_t tx_id, const 
 int mcu_can_enable_interrupts(const devfs_handle_t * handle);
 int mcu_can_disable_interrupts(const devfs_handle_t * handle);
 
+#define CAN_RAW_DECLARE_CONFIG_STATE(can_raw_name,\
+    can_reset_attr_baudrate, can_reset_attr_loopback ) \
+    const can_reset_attr_t can_raw_name##_config = { \
+       .baudRate = can_reset_attr_baudrate, \
+       .bLoopBack = can_reset_attr_loopback, \
+    }
+
 #ifdef __cplusplus
 }
 #endif
