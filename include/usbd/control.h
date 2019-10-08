@@ -23,8 +23,8 @@
  *
  */
 
-#ifndef MCU_USBD_CONTROL_H_
-#define MCU_USBD_CONTROL_H_
+#ifndef USBD_CONTROL_H_
+#define USBD_CONTROL_H_
 
 #include "sos/fs/devfs.h"
 #include "sos/dev/usb.h"
@@ -52,7 +52,7 @@ typedef struct {
 typedef struct {
   u8 * dptr;
   u16 nbyte;
-  u16 max;
+  u16 is_zlp;
 } usbd_control_data_t;
 
 typedef struct MCU_PACK {
@@ -71,6 +71,7 @@ typedef struct MCU_PACK {
 	const devfs_handle_t * handle;
 } usbd_control_t;
 
+void usbd_control_svcall_init(void * context);
 void usbd_control_root_init(void * context);
 int usbd_control_handler(void * context, const mcu_event_t * data);
 
@@ -115,7 +116,6 @@ static inline int usbd_control_setup_request_recipient(usbd_control_t * context)
 
 static inline void usbd_control_prepare_buffer(usbd_control_t * context){
 	context->data.dptr = context->buf;
-	context->data.max = USBD_CONTROL_DATAOUT_BUF_SIZE;
 }
 
 
@@ -137,6 +137,6 @@ int usbd_control_configure_endpoint(const devfs_handle_t * handle, const usbd_en
 
 
 
-#endif /* MCU_USBD_CONTROL_H_ */
+#endif /* USBD_CONTROL_H_ */
 
 /*! @} */

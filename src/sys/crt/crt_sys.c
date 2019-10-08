@@ -33,8 +33,9 @@ typedef struct {
 	int data_size;
 } root_load_data_t;
 
-static void root_load_data(void * args) MCU_ROOT_EXEC_CODE;
-void root_load_data(void * args){
+static void svcall_load_data(void * args) MCU_ROOT_EXEC_CODE;
+void svcall_load_data(void * args){
+	CORTEXM_SVCALL_ENTER();
 
 	root_load_data_t * p = args;
 	int size;
@@ -44,19 +45,19 @@ void root_load_data(void * args){
 	void * dest_addr;
 
 	//sanity check the size
-	size =  mpu_size((u32)sos_task_table[ task_get_current() ].mem.data.size);
+	size =  sos_task_table[ task_get_current() ].mem.data.size;
 	if( p->data_size < size ){ //p->data_size is the total amount of RAM available to the application
 		size = p->data_size;
 	}
 
 	code_size = p->code_size;
-	if( code_size > mpu_size((u32)sos_task_table[ task_get_current() ].mem.code.size) ){
+	if( code_size > sos_task_table[ task_get_current() ].mem.code.size ){
 		//fatal error here?
 		return;
 	}
 
-	dest_addr = mpu_addr((u32)sos_task_table[ task_get_current() ].mem.data.addr);
-	code_addr = mpu_addr((u32)sos_task_table[ task_get_current() ].mem.code.addr);
+	dest_addr = sos_task_table[ task_get_current() ].mem.data.address;
+	code_addr = sos_task_table[ task_get_current() ].mem.code.address;
 	code_size = p->code_size;
 	src_addr = code_addr + code_size;
 	memcpy(dest_addr, src_addr, size);
@@ -67,7 +68,7 @@ void crt_load_data(void * global_reent, int code_size, int data_size){
 	root_load_data_t args;
 	args.code_size = code_size;
 	args.data_size = data_size;
-	cortexm_svcall(root_load_data, &args);
+	cortexm_svcall(svcall_load_data, &args);
 }
 
 char ** const crt_import_argv(char * path_arg, int * argc){

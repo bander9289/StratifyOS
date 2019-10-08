@@ -84,7 +84,7 @@ int task_init_single(int (*initial_thread)() /*! the single thread to execute */
 							int system_memory_size /*! The size of the system memory */) MCU_ROOT_CODE;
 
 int task_interrupt(task_interrupt_t * intr);
-void task_root_interrupt(void * args) MCU_ROOT_CODE;
+void task_svcall_interrupt(void * args) MCU_ROOT_CODE;
 int task_mpu_calc_protection(task_memories_t * mem);
 u32 task_interrupt_stacksize();
 
@@ -93,14 +93,14 @@ void task_root_set_current_priority(s8 value);
 void task_root_elevate_current_priority(s8 value);
 
 //higher numbers take precedence over lower numbers
-#define TASK_SYSTEM_STACK_MPU_REGION 7
-#define TASK_SYSTEM_CODE_MPU_REGION 6
-#define TASK_SYSTEM_DATA_MPU_REGION 5
-#define TASK_APPLICATION_STACK_GUARD_REGION 4 //stack guard must have higher precedence than application data
+#define TASK_SYSTEM_SECRET_KEY_REGION 7
+#define TASK_SYSTEM_STACK_MPU_REGION 6
+#define TASK_SYSTEM_CODE_MPU_REGION 5
+#define TASK_SYSTEM_DATA_MPU_REGION 4
+#define TASK_APPLICATION_STACK_GUARD_REGION 3 //stack guard must have higher precedence than application data because they overlap
 #define TASK_APPLICATION_CODE_MPU_REGION 2
-#define TASK_APPLICATION_DATA_MPU_REGION 3
-#define TASK_APPLICATION_DATA_USER_REGION_HIGH_PRIORITY 1
-#define TASK_APPLICATION_DATA_USER_REGION_LOW_PRIORITY 0
+#define TASK_APPLICATION_DATA_MPU_REGION 1
+#define TASK_APPLICATION_DATA_USER_REGION 0
 
 
 #endif

@@ -375,7 +375,11 @@ int drive_sdspi_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 					if( is_busy(handle) != 0 ){
 						return SYSFS_SET_RETURN(EBUSY);
 					}
-					return erase_blocks(handle, attr->start, attr->end);
+					int result = erase_blocks(handle, attr->start, attr->end);
+					if( result < 0 ){
+						return result;
+					}
+					return attr->end - attr->start;
 				}
 			}
 
@@ -510,8 +514,8 @@ int drive_sdspi_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 			info->o_flags = DRIVE_FLAG_ERASE_BLOCKS|DRIVE_FLAG_INIT;
 
 			//Write block size and address are fixed to BLOCK_SIZE
-			info->address_size = BLOCK_SIZE;
-			info->write_block_size = info->address_size;
+			info->addressable_size = BLOCK_SIZE;
+			info->write_block_size = info->addressable_size;
 
 			//This is from CSD C_Size and TRANS_SPEED
 			if( exec_csd(handle, buffer) < 0 ){

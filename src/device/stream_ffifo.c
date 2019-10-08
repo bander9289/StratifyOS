@@ -81,6 +81,13 @@ int event_write_complete(void * context, const mcu_event_t * event){
 		ffifo_data_transmitted(&config->tx, &state->tx.ffifo);
 	}
 
+	if( (state->o_flags & STREAM_FFIFO_FLAG_STOP) &&
+		 (event->o_events & MCU_EVENT_FLAG_HIGH) ){
+		state->o_flags = 0;
+		mcu_debug_log_info(MCU_DEBUG_DEVICE, "%s():%d stopped", __FUNCTION__, __LINE__);
+		return 0; //tells the interrupt handler to stop the stream
+	}
+
 	return 1;
 }
 
@@ -120,6 +127,12 @@ int event_data_ready(void * context, const mcu_event_t * event){
 		ffifo_data_received(&config->rx, ffifo_state);
 	}
 
+	if( (state->o_flags & STREAM_FFIFO_FLAG_STOP) &&
+		 (event->o_events & MCU_EVENT_FLAG_HIGH) ){
+		state->o_flags = 0;
+		mcu_debug_log_info(MCU_DEBUG_DEVICE, "%s():%d stopped", __FUNCTION__, __LINE__);
+		return 0; //tells the interrupt handler to stop the stream
+	}
 
 	return 1;
 }
@@ -158,7 +171,31 @@ int stream_ffifo_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 
 			if( attr->o_flags & STREAM_FFIFO_FLAG_START ){
 
+				state->o_flags = STREAM_FFIFO_FLAG_START;
+
 				mcu_debug_log_info(MCU_DEBUG_DEVICE, "Start Stream");
+				if( config->rx.buffer ){
+					//the application reads the RX buffer the is written by the device and data that is read from hardware
+					state->rx.async.loc = config->rx_loc;
+					state->rx.async.tid = task_get_current();
+					state->rx.async.flags = O_RDWR;
+					state->rx.async.buf = config->rx.buffer;
+					state->rx.async.nbyte = config->rx.frame_size * config->rx.frame_count;
+					state->rx.async.handler.context = (void*)handle;
+					state->rx.async.handler.callback = event_data_ready;
+
+					state->rx.error = 0;
+					state->rx.access_count = 0;
+
+					state->rx.ffifo.transfer_handler.read = 0;
+					state->rx.ffifo.transfer_handler.write = 0;
+					ffifo_flush(&(state->rx.ffifo));
+
+					//on the first call the FIFO is full of zeros and returns immediately
+					if( config->device->driver.read(&config->device->handle, &(state->rx.async)) < 0 ){
+						return SYSFS_SET_RETURN(EIO);
+					}
+				}
 
 				if( config->tx.buffer ){
 					//The application writes data to the FIFO that is then read by the hardware and written to a device
@@ -195,32 +232,9 @@ int stream_ffifo_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 					if( result < 0 ){ return result; }
 				}
 
-
-				if( config->rx.buffer ){
-					//the application reads the RX buffer the is written by the device and data that is read from hardware
-					state->rx.async.loc = config->rx_loc;
-					state->rx.async.tid = task_get_current();
-					state->rx.async.flags = O_RDWR;
-					state->rx.async.buf = config->rx.buffer;
-					state->rx.async.nbyte = config->rx.frame_size * config->rx.frame_count;
-					state->rx.async.handler.context = (void*)handle;
-					state->rx.async.handler.callback = event_data_ready;
-
-					state->rx.error = 0;
-					state->rx.access_count = 0;
-
-					state->rx.ffifo.transfer_handler.read = 0;
-					state->rx.ffifo.transfer_handler.write = 0;
-					ffifo_flush(&(state->rx.ffifo));
-
-					//on the first call the FIFO is full of zeros and returns immediately
-					if( config->device->driver.read(&config->device->handle, &(state->rx.async)) < 0 ){
-						return SYSFS_SET_RETURN(EIO);
-					}
-				}
 			} else if( attr->o_flags & STREAM_FFIFO_FLAG_STOP ){
-
-
+				state->o_flags = STREAM_FFIFO_FLAG_STOP;
+				return 3;
 			}
 
 			if( attr->o_flags & STREAM_FFIFO_FLAG_FLUSH ){
@@ -244,6 +258,10 @@ int stream_ffifo_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 			info->rx.access_count = state->rx.access_count;
 			info->tx.error = state->tx.error;
 			info->rx.error = state->rx.error;
+			info->o_flags = STREAM_FFIFO_FLAG_FLUSH |
+					STREAM_FFIFO_FLAG_START |
+					STREAM_FFIFO_FLAG_STOP;
+			info->o_status = state->o_flags;
 			return 0;
 
 		case I_STREAM_FFIFO_SETACTION:
@@ -272,6 +290,10 @@ int stream_ffifo_read(const devfs_handle_t * handle, devfs_async_t * async){
 
 	if( config->rx.buffer == 0 ){ return SYSFS_SET_RETURN(ENOSYS); }
 
+	if( (state->o_flags & STREAM_FFIFO_FLAG_START) == 0 ){
+		return SYSFS_SET_RETURN(EAGAIN);
+	}
+
 	//this will never need to execute a callback because the FIFO is written by hardware
 	return ffifo_read_local(&(config->rx), &(state->rx.ffifo), async, 0);
 }
@@ -281,6 +303,10 @@ int stream_ffifo_write(const devfs_handle_t * handle, devfs_async_t * async){
 	stream_ffifo_state_t * state = handle->state;
 
 	if( config->tx.buffer == 0 ){ return SYSFS_SET_RETURN(ENOSYS); }
+
+	if( (state->o_flags & STREAM_FFIFO_FLAG_START) == 0 ){
+		return SYSFS_SET_RETURN(EAGAIN);
+	}
 
 	//this will never need to execute a callback because the FIFO is read by hardware
 	return ffifo_write_local(&(config->tx), &(state->tx.ffifo), async, 0);

@@ -13,8 +13,8 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with Stratify OS.  If not, see <http://www.gnu.org/licenses/>.
- * 
- * 
+ *
+ *
  */
 
 /*! \addtogroup unistd
@@ -37,7 +37,8 @@
 #include "../scheduler/scheduler_local.h"
 
 /*! \cond */
-void root_assign_handle(void * args){
+void svcall_assign_handle(void * args){
+	CORTEXM_SVCALL_ENTER();
 	int * argp = args;
 	int i;
 	int start = *argp;
@@ -55,7 +56,7 @@ void root_assign_handle(void * args){
 int u_new_open_file(int start){
 	int arg = start;
 
-	cortexm_svcall(root_assign_handle, &arg);
+	cortexm_svcall(svcall_assign_handle, &arg);
 	if( arg < 0 ){
 		errno = EMFILE;
 	}
@@ -109,7 +110,7 @@ int open(const char * name, int flags, ... );
 /*! \cond */
 int _open(const char * name, int flags, ...) {
 	int tmp;
-    int ret;
+	int ret;
 	int fildes;
 	va_list ap;
 	int mode;
@@ -134,15 +135,15 @@ int _open(const char * name, int flags, ...) {
 	tmp = 0;
 	//check the access mode
 	switch( (flags & O_ACCMODE) ){
-	case O_RDONLY:
-		tmp = R_OK;
-		break;
-	case O_WRONLY:
-		tmp = W_OK;
-		break;
-	case O_RDWR:
-		tmp = R_OK|W_OK;
-		break;
+		case O_RDONLY:
+			tmp = R_OK;
+			break;
+		case O_WRONLY:
+			tmp = W_OK;
+			break;
+		case O_RDWR:
+			tmp = R_OK|W_OK;
+			break;
 	}
 
 	if ( flags & O_CREAT ){
@@ -152,14 +153,14 @@ int _open(const char * name, int flags, ...) {
 		va_end(ap);
 		tmp = mode & S_IFMT;
 		switch(tmp){
-		case S_IFDIR:
-			//This is not the correct way to create a directory (must use mkdir)
-			errno = EINVAL;
-			return -1;
-		case 0:
-			//If no format is specified then create a regular file
-			mode = mode | S_IFREG;
-			break;
+			case S_IFDIR:
+				//This is not the correct way to create a directory (must use mkdir)
+				errno = EINVAL;
+				return -1;
+			case 0:
+				//If no format is specified then create a regular file
+				mode = mode | S_IFREG;
+				break;
 		}
 	} else {
 		mode = 0;
@@ -167,9 +168,9 @@ int _open(const char * name, int flags, ...) {
 
 	set_open_file(fildes, fs, (void*)1, flags);
 
-    if( (ret = sysfs_file_open(get_open_file(fildes), sysfs_stripmountpath(fs, name), mode)) <  0){
+	if( (ret = sysfs_file_open(get_open_file(fildes), sysfs_stripmountpath(fs, name), mode)) <  0){
 		u_reset_fildes(fildes);
-        return ret;
+		return ret;
 	}
 
 	if ( flags & O_APPEND ){
@@ -219,18 +220,18 @@ int u_init_stdio(int fildes){
 #if USE_STDIO != 0
 	FILE * ptr;
 	switch(fildes){
-	case STDIN_FILENO:
-		ptr = _REENT->_stdin;
-		break;
-	case STDOUT_FILENO:
-		ptr = _REENT->_stdout;
-		break;
-	case STDERR_FILENO:
-		ptr = _REENT->_stderr;
-		break;
-	default:
-		errno = EBADF;
-		return -1;
+		case STDIN_FILENO:
+			ptr = _REENT->_stdin;
+			break;
+		case STDOUT_FILENO:
+			ptr = _REENT->_stdout;
+			break;
+		case STDERR_FILENO:
+			ptr = _REENT->_stderr;
+			break;
+		default:
+			errno = EBADF;
+			return -1;
 	}
 
 	//threads should use the already open descriptors of the process

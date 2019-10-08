@@ -30,7 +30,7 @@ volatile s8 m_task_current_priority MCU_SYS_MEM;
 static volatile u8 m_task_exec_count MCU_SYS_MEM;
 int m_task_rr_reload MCU_SYS_MEM;
 volatile int m_task_current MCU_SYS_MEM;
-static void root_task_read_rr_timer(u32 * val);
+static void svcall_read_rr_timer(u32 * val);
 static int set_systick_interval(int interval) MCU_ROOT_CODE;
 static void switch_contexts();
 
@@ -126,17 +126,16 @@ int task_init(int interval,
 	FPU->FPCCR = 0; //don't automatically save the FPU registers -- save them manually
 #endif
 
-	//this will causes crashes if it is moved after the context switching begins
-	mcu_core_enable_cache();
 
 	//Turn on the task timer (MCU implementation dependent)
 	set_systick_interval(interval);
 	sos_task_table[0].rr_time = m_task_rr_reload;
 	cortexm_set_stack_ptr( (void*)&_top_of_stack ); //reset the handler stack pointer
 	cortexm_enable_systick_irq();  //Enable context switching
-
-
 	task_root_switch_context();
+
+	while(1){}
+
 	return 0;
 }
 
@@ -177,27 +176,30 @@ int task_create_thread(void *(*p)(void*),
 	}
 
 	//Initialize the task
-	task.stackaddr = stackaddr;
+	task.stackaddr = stackaddr; //security?
 	task.start = (u32)p;
 	task.stop = (u32)cleanup;
 	task.r0 = (u32)arg;
 	task.r1 = 0;
-	task.pid = pid;
+	task.pid = pid; //security?
 	task.flags = TASK_FLAGS_USED | TASK_FLAGS_THREAD;
-	task.parent = task_get_parent(thread_zero);
-	task.priority = 0;
-	task.reent = mem_addr;
+	task.parent = task_get_parent(thread_zero); //security?
+	task.priority = 0; //security?
+	task.reent = mem_addr; //security?
 	task.global_reent = sos_task_table[ thread_zero ].global_reent;
 	task.mem = (void*)&(sos_task_table[ thread_zero ].mem);
 
 	//Do a priv call while accessing the task table so there are no interruptions
-	cortexm_svcall( (cortexm_svcall_t)task_root_new_task, &task);
+	cortexm_svcall( (cortexm_svcall_t)task_svcall_new_task, &task);
 	return task.tid;
 }
 
-void task_root_new_task(new_task_t * task){
+void task_svcall_new_task(new_task_t * task){
+	CORTEXM_SVCALL_ENTER();
 	int i;
 	hw_stack_frame_t * frame;
+
+	//validate arguments
 
 	for(i=1; i < task_get_total(); i++){
 		if ( !task_used_asserted(i) ){
@@ -205,6 +207,8 @@ void task_root_new_task(new_task_t * task){
 			sos_task_table[i].pid = task->pid;
 			sos_task_table[i].parent = task->parent;
 			sos_task_table[i].flags = task->flags;
+			//never start a task with root set -- call seteuid() to make root
+			sos_task_table[i].flags &= ~TASK_FLAGS_ROOT;
 			sos_task_table[i].sp = task->stackaddr - sizeof(hw_stack_frame_t) - sizeof(sw_stack_frame_t);
 			sos_task_table[i].reent = task->reent;
 			sos_task_table[i].global_reent = task->global_reent;
@@ -245,8 +249,8 @@ void task_root_delete(int id){
 
 void task_root_resetstack(int id){
 	//set the stack pointer to the original value
-	sos_task_table[id].sp = mpu_addr((u32)sos_task_table[id].mem.data.addr) + mpu_size((u32)sos_task_table[id].mem.data.size) -
-			(sizeof(hw_stack_frame_t) + sizeof(sw_stack_frame_t));
+	sos_task_table[id].sp = (void*)((u32)sos_task_table[id].mem.data.address + sos_task_table[id].mem.data.size -
+			(sizeof(hw_stack_frame_t) + sizeof(sw_stack_frame_t)));
 	if( id == task_get_current() ){ //make effective now
 		cortexm_set_thread_stack_ptr((void*)sos_task_table[id].sp);
 	}
@@ -266,7 +270,8 @@ void * task_get_sbrk_stack_ptr(struct _reent * reent_ptr){
 				if ( task_used_asserted(i) ){
 					if ( (i == task_get_current()) ){
 						//If the main thread is the current thread return the current stack
-						cortexm_svcall(cortexm_get_thread_stack_ptr, &stackaddr);
+						//security? can set stackaddr to any value -- only write valid locations
+						cortexm_svcall(cortexm_svcall_get_thread_stack_ptr, &stackaddr);
 						return stackaddr;
 					} else {
 						//Return the stack value from thread 0 if another thread is running
@@ -296,7 +301,8 @@ int task_get_thread_zero(int pid){
 	return -1;
 }
 
-static void root_task_read_rr_timer(u32 * val){
+static void svcall_read_rr_timer(u32 * val){
+	CORTEXM_SVCALL_ENTER();
 	*val = m_task_rr_reload - SysTick->VAL;
 }
 
@@ -306,7 +312,7 @@ u64 task_root_gettime(int tid){
 	if ( tid != task_get_current() ){
 		return sos_task_table[tid].timer.t + (m_task_rr_reload - sos_task_table[tid].rr_time);
 	} else {
-		root_task_read_rr_timer(&val);
+		svcall_read_rr_timer(&val);
 		return sos_task_table[tid].timer.t + val;
 	}
 }
@@ -317,7 +323,8 @@ u64 task_gettime(int tid){
 	if ( tid != task_get_current() ){
 		return sos_task_table[tid].timer.t + (m_task_rr_reload - sos_task_table[tid].rr_time);
 	} else {
-		cortexm_svcall((cortexm_svcall_t)root_task_read_rr_timer, &val);
+		//security? args is written
+		cortexm_svcall((cortexm_svcall_t)svcall_read_rr_timer, &val);
 		return sos_task_table[tid].timer.t + val;
 	}
 }
@@ -379,15 +386,15 @@ void switch_contexts(){
 	//Enable the MPU for the task stack guard
 #if MPU_PRESENT || __MPU_PRESENT
 	//Enable the MPU for the process code section
-	MPU->RBAR = (u32)(sos_task_table[m_task_current].mem.code.addr);
-	MPU->RASR = (u32)(sos_task_table[m_task_current].mem.code.size);
+	MPU->RBAR = (u32)(sos_task_table[m_task_current].mem.code.rbar);
+	MPU->RASR = (u32)(sos_task_table[m_task_current].mem.code.rasr);
 
 	//Enable the MPU for the process data section
-	MPU->RBAR = (u32)(sos_task_table[m_task_current].mem.data.addr);
-	MPU->RASR = (u32)(sos_task_table[m_task_current].mem.data.size);
+	MPU->RBAR = (u32)(sos_task_table[m_task_current].mem.data.rbar);
+	MPU->RASR = (u32)(sos_task_table[m_task_current].mem.data.rasr);
 
-	MPU->RBAR = (u32)(sos_task_table[m_task_current].mem.stackguard.addr);
-	MPU->RASR = (u32)(sos_task_table[m_task_current].mem.stackguard.size);
+	MPU->RBAR = (u32)(sos_task_table[m_task_current].mem.stackguard.rbar);
+	MPU->RASR = (u32)(sos_task_table[m_task_current].mem.stackguard.rasr);
 
 	//disable MPU for ROOT tasks
 	if( task_root_asserted(m_task_current) ){
@@ -485,10 +492,11 @@ void mcu_core_pendsv_handler(){
 }
 
 
-static void root_task_restore(void * args) MCU_NAKED;
-void root_task_restore(void * args){
+static void svcall_restore_task(void * args) MCU_NAKED;
+void svcall_restore_task(void * args){
 	asm volatile ("push {lr}\n\t");
 	u32 pstack;
+	CORTEXM_SVCALL_ENTER();
 
 	//discard the current HW stack by adjusting the PSP up by sizeof(hw_stack_frame_t) --sw_stack_frame_t is same size
 	pstack = __get_PSP();
@@ -503,7 +511,7 @@ void root_task_restore(void * args){
 
 void task_restore(){
 	//handlers inserted with task_interrupt() must call this function when the task completes in order to restore the stack
-	cortexm_svcall(root_task_restore, NULL);
+	cortexm_svcall(svcall_restore_task, NULL);
 }
 
 int task_root_interrupt_call(void * args){
@@ -551,9 +559,10 @@ u32 task_interrupt_stacksize(){
 }
 
 
-void task_root_interrupt(void * args){
+void task_svcall_interrupt(void * args){
 	task_save_context(); //save the current software context
 	//This function inserts the handler on the specified task's stack
+	CORTEXM_SVCALL_ENTER();
 
 	if( task_root_interrupt_call(args) ){
 		task_load_context(); //the context needs to be loaded for the current task -- otherwise it is loaded by the switcher
@@ -562,7 +571,7 @@ void task_root_interrupt(void * args){
 
 int task_interrupt(task_interrupt_t * intr){
 	if ( intr->tid < task_get_total() ){
-		cortexm_svcall(task_root_interrupt, intr);
+		cortexm_svcall(task_svcall_interrupt, intr);
 		return 0;
 	}
 	return -1;

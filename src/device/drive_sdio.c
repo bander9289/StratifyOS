@@ -62,7 +62,11 @@ int drive_sdio_ioctl(const devfs_handle_t * handle, int request, void * ctl){
                 sdio_attr.o_flags = SDIO_FLAG_ERASE_BLOCKS;
                 sdio_attr.start = attr->start;
                 sdio_attr.end = attr->end;
-                return mcu_sdio_setattr(handle, &sdio_attr);
+					 int result = mcu_sdio_setattr(handle, &sdio_attr);
+					 if( result < 0 ){
+						 return result;
+					 }
+					 return attr->end - attr->start;
             }
         }
 
@@ -88,7 +92,7 @@ int drive_sdio_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 
         info->o_flags = DRIVE_FLAG_ERASE_BLOCKS | DRIVE_FLAG_INIT;
         info->o_events = sdio_info.o_events;
-        info->address_size = sdio_info.block_size;
+		  info->addressable_size = sdio_info.block_size;
         info->bitrate = sdio_info.freq;
         info->erase_block_size = sdio_info.block_size;
         info->erase_block_time = 0;

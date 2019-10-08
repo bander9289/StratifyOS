@@ -45,6 +45,10 @@ extern "C" {
 #define PWM_VERSION (0x030000)
 #define PWM_IOC_IDENT_CHAR 'p'
 
+/*! \details PWM flags used with
+ * pwm_attr_t.o_flags and I_PMW_SETATTR.
+ *
+ */
 typedef enum {
 	PWM_FLAG_SET_TIMER /*! Set to configure the frequency and period (implies PWM_FLAG_SET_CHANNEL) */ = (1<<0),
 	PWM_FLAG_IS_ACTIVE_HIGH /*! Set to configure the outputs as active high */ = (1<<1),
@@ -66,12 +70,13 @@ typedef struct MCU_PACK {
 	mcu_pin_t channel[4];
 } pwm_pin_assignment_t;
 
+/*! \details PWM Attributes */
 typedef struct MCU_PACK {
-	u32 o_flags;
+	u32 o_flags /*! Or'd flags such as PWM_FLAG_SET_TIMER */;
 	pwm_pin_assignment_t pin_assignment;
 	u32 freq /*! The PWM counter frequency */;
 	u32 period /*! The PWM period in counts */;
-	mcu_channel_t channel;
+	mcu_channel_t channel /*! Channel when using PWM_FLAG_SET_CHANNELS */;
 	u32 resd[8];
 } pwm_attr_t;
 

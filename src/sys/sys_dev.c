@@ -25,6 +25,7 @@
 #include "mcu/core.h"
 #include "device/sys.h"
 #include "mcu/debug.h"
+#include "mcu/mcu.h"
 #include "scheduler/scheduler_local.h"
 #include "cortexm/mpu.h"
 
@@ -37,9 +38,6 @@ extern void mcu_core_hardware_id();
 static int read_task(sys_taskattr_t * task);
 static int sys_setattr(const devfs_handle_t * handle, void * ctl);
 
-extern u32 _text;
-
-u8 sys_euid MCU_SYS_MEM;
 
 int sys_open(const devfs_handle_t * handle){
 	return 0;
@@ -62,6 +60,7 @@ int sys_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 			info->cpu_freq = mcu_core_getclock();
 			info->sys_mem_size = sos_board_config.sys_memory_size;
 			info->o_flags = sos_board_config.o_sys_flags;
+			info->o_mcu_board_config_flags = mcu_board_config.o_flags;
 			strncpy(info->id, sos_board_config.sys_id, PATH_MAX-1);
 			strncpy(info->stdin_name, sos_board_config.stdin_dev, NAME_MAX-1);
 			strncpy(info->stdout_name, sos_board_config.stdout_dev, NAME_MAX-1);
@@ -85,18 +84,18 @@ int sys_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 			return 0;
 		case I_SYS_KILL:
 			for(i = 1; i < task_get_total(); i++){
-				if( (task_get_pid(i) == killattr->id) &&
+				if( (task_get_pid(i) == killattr->id) && task_enabled(i) &&
 					 !task_thread_asserted(i)
 					 ){
-					signal_root_send(task_get_current(),
-										  i,
-										  killattr->si_signo,
-										  killattr->si_sigcode,
-										  killattr->si_sigvalue, 1);
-					break;
+					int result = signal_root_send(task_get_current(),
+															i,
+															killattr->si_signo,
+															killattr->si_sigcode,
+															killattr->si_sigvalue, 1);
+					return result;
 				}
 			}
-			return 0;
+			return SYSFS_SET_RETURN(EINVAL);
 		case I_SYS_PTHREADKILL:
 			return signal_root_send(task_get_current(),
 											killattr->id,
@@ -104,11 +103,27 @@ int sys_ioctl(const devfs_handle_t * handle, int request, void * ctl){
 											killattr->si_sigcode,
 											killattr->si_sigvalue, 1);
 		case I_SYS_GETBOARDCONFIG:
+
 			memcpy(ctl, &sos_board_config, sizeof(sos_board_config));
 			return 0;
 
+
+		case I_SYS_GETMCUBOARDCONFIG:
+			{
+				mcu_board_config_t * config = ctl;
+				memcpy(config, &mcu_board_config, sizeof(mcu_board_config));
+				//dont' provide any security info to non-root callers
+				if( scheduler_authenticated_asserted( task_get_current() ) == 0 ){
+					config->secret_key_address = (void*)-1;
+					config->secret_key_size = 0;
+				}
+				return 0;
+			}
+
+
 		case I_SYS_SETATTR:
 			return sys_setattr(handle, ctl);
+
 
 
 		default:
@@ -136,9 +151,9 @@ int read_task(sys_taskattr_t * task){
 			task->is_enabled = 1;
 			task->pid = task_get_pid( task->tid );
 			task->timer = task_root_gettime(task->tid);
-			task->mem_loc = (uint32_t)sos_sched_table[task->tid].attr.stackaddr;
+			task->mem_loc = (u32)sos_sched_table[task->tid].attr.stackaddr;
 			task->mem_size = sos_sched_table[task->tid].attr.stacksize;
-			task->stack_ptr = (uint32_t)sos_task_table[task->tid].sp;
+			task->stack_ptr = (u32)sos_task_table[task->tid].sp;
 			task->prio = task_get_priority(task->tid);
 			task->prio_ceiling = sos_sched_table[task->tid].attr.schedparam.sched_priority;
 			task->is_active = (task_active_asserted(task->tid) != 0) | ((task_stopped_asserted(task->tid != 0)<<1));
@@ -146,12 +161,20 @@ int read_task(sys_taskattr_t * task){
 
 			strncpy(task->name, ((struct _reent*)sos_task_table[ task->tid ].global_reent)->procmem_base->proc_name, NAME_MAX);
 
-			if ( !task->is_thread && ( sos_task_table[task->tid].reent != NULL) ){
-				task->malloc_loc = (uint32_t)&(((struct _reent*)sos_task_table[task->tid].reent)->procmem_base->base)
-						+ ((struct _reent*)sos_task_table[task->tid].reent)->procmem_base->size;
+#if 1
+			task->malloc_loc = scheduler_calculate_heap_end(task->tid);
+#else
+			if ( !task->is_thread &&
+				  ( sos_task_table[task->tid].reent != NULL)
+				  ){
+				task->malloc_loc =
+						(u32)&(((struct _reent*)sos_task_table[task->tid].reent)->procmem_base->base) +
+						((struct _reent*)sos_task_table[task->tid].reent)->procmem_base->size;
+
 			} else {
 				task->malloc_loc = 0;
 			}
+#endif
 
 
 			ret = 1;
@@ -178,8 +201,7 @@ int sys_setattr(const devfs_handle_t * handle, void * ctl){
 
 	if( o_flags & SYS_FLAG_SET_MEMORY_REGION ){
 
-		if( attr->region == TASK_APPLICATION_DATA_USER_REGION_HIGH_PRIORITY ||
-			 attr->region == TASK_APPLICATION_DATA_USER_REGION_LOW_PRIORITY ){
+		if( attr->region == TASK_APPLICATION_DATA_USER_REGION ){
 
 			int type = MPU_MEMORY_SRAM;
 			if( o_flags & SYS_FLAG_IS_FLASH ){
@@ -213,11 +235,7 @@ int sys_setattr(const devfs_handle_t * handle, void * ctl){
 		} else {
 			return SYSFS_SET_RETURN(EINVAL);
 		}
-
-
 	}
-
 	return 0;
-
 }
 

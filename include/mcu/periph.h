@@ -22,6 +22,7 @@
 #include "dac.h"
 #include "can.h"
 #include "core.h"
+#include "crypt.h"
 #include "eint.h"
 #include "emc.h"
 #include "eeprom.h"

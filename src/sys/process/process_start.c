@@ -97,9 +97,9 @@ int process_start(const char *path_arg, char *const envp[], int options){
 		return -1;
 	}
 
-	mem.code.addr = (void*)startup.exec.code_start;
+	mem.code.address = (void*)startup.exec.code_start;
 	mem.code.size = startup.exec.code_size;
-	mem.data.addr = (void*)startup.exec.ram_start;
+	mem.data.address = (void*)startup.exec.ram_start;
 	mem.data.size = startup.exec.ram_size;
 
 	//check to see if the process is already running
@@ -125,30 +125,35 @@ int process_start(const char *path_arg, char *const envp[], int options){
 	mcu_debug_log_info(MCU_DEBUG_SYS, "process start: execute %s", process_path);
 
 	int parent_id = task_get_current();
+	int is_root = 0;
 
 	if( options & APPFS_FLAG_IS_ORPHAN ){
 		parent_id = 0;
 	}
 
+	if( options & APPFS_FLAG_IS_ROOT ){
+		is_root = 1;
+	}
+
 	mcu_debug_log_info(MCU_DEBUG_SYS, "process start: code:%p data:%p", (void*)startup.exec.startup,
 							 (void*)startup.exec.ram_start);
 
-	err = scheduler_create_process((void*)startup.exec.startup,
-											 process_path,
-											 &mem,
-											 (void*)startup.exec.ram_start,
-											 parent_id);
+	err = scheduler_create_process(
+				(void*)startup.exec.startup,
+				process_path,
+				&mem,
+				(void*)startup.exec.ram_start,
+				parent_id,
+				is_root //ignored if caller is not authenticated
+				);
 
 	if( err < 0 ){
 		_free_r(sos_task_table[0].global_reent, process_path);
 	}
 
 	mcu_debug_log_info(MCU_DEBUG_SYS, "process_start:returned %d", err);
-
 	return err;
 }
-
-
 
 int reent_is_free(struct _reent * reent){
 	int i;

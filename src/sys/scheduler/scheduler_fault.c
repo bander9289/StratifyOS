@@ -45,14 +45,18 @@ void scheduler_fault_build_trace_string(char * dest){
 	strcpy(dest, "F");
 	htoa(hex_buffer, m_scheduler_fault.fault.num);
 	strcat(dest, hex_buffer);
-	strcat(dest, ":0x");
+	strcat(dest, ":");
 	htoa(hex_buffer, (u32)m_scheduler_fault.fault.addr);
 	strcat(dest, hex_buffer);
 }
 
 void scheduler_fault_build_string(char * dest, const char * term){
 	char hex_buffer[9];
-	strcpy(dest, "F");
+	strcpy(dest, "I");
+	htoa(hex_buffer, m_scheduler_fault.tid);
+	strcat(dest, hex_buffer);
+
+	strcat(dest, ":F");
 	htoa(hex_buffer, m_scheduler_fault.fault.num);
 	strcat(dest, hex_buffer);
 

@@ -34,6 +34,7 @@
 #define SOS_DEV_SYS_H_
 
 #include "mcu/types.h"
+#include "mcu/mcu.h"
 #include "sos/link/types.h"
 
 
@@ -45,7 +46,13 @@ extern "C" {
 #define SYS_VERSION (0x030200)
 #define SYS_IOC_CHAR 's'
 
-enum {
+/*! \details SYS flags used with
+ * o_flags in sos_board_config_t.
+ *
+ *
+ *
+ */
+enum sys_board_config_flags {
 	SYS_FLAG_IS_STDIO_FIFO /*! Indicates STDIO are independent FIFOs (board config flag) */ = (1<<0),
 	SYS_FLAG_IS_STDIO_VCP /*! Deprecated (board config flag) */ = (1<<1),
 	SYS_FLAG_IS_WDT_DISABLED /*! Disables the WDT (board config flag) */ = (1<<2),
@@ -53,10 +60,13 @@ enum {
 	SYS_FLAG_IS_TRACE /*! Deprecated (board config flag) */ = (1<<4),
 	SYS_FLAG_IS_STDIO_CFIFO /*! STDIO is a with channels 0:stdout 1:stdin 2: stderr (board config flag) */ = (1<<5),
 	SYS_FLAG_IS_STDIO_CFIFO_SHARE_OUTERR /*! Used with SYS_FLAG_IS_STDIO_CFIFO to indicate stderr and stdout are the same channel (0) (board config flag) */ = (1<<6),
-	SYS_FLAG_IS_ACTIVE_ON_IDLE /*! Don't stop the CPU when the system is idle (board config flag) */ = (1<<7)
+	SYS_FLAG_IS_ACTIVE_ON_IDLE /*! Don't stop the CPU when the system is idle (board config flag) */ = (1<<7),
+	SYS_FLAG_IS_KEYED /*! Binary has a 256-bit secret key appended to the end (before HASH if present).*/ = (1<<8),
+	SYS_FLAG_IS_HASHED /*! Binary has a 256-bit SHA256 hash appended to the end (after secret key if present) */ = (1<<9),
+	SYS_FLAG_IS_FIRST_THREAD_ROOT /*! First thread is started as a root enabled thread */ = (1<<10)
 };
 
-enum {
+enum sys_memory_flags {
 	SYS_FLAG_SET_MEMORY_REGION = (1<<0),
 	SYS_FLAG_IS_READ_ALLOWED = (1<<1),
 	SYS_FLAG_IS_WRITE_ALLOWED = (1<<2),
@@ -69,7 +79,7 @@ typedef struct MCU_PACK {
 	char sys_version[8] /*!  The System (board) Version */;
 	char arch[16] /*!  The target architecture (v7m, v7em, v7em_f4ss, v7em_f4sh, v7em_f5ss, v7em_f5sh, v7em_f5ds, v7em_f5dh) */;
 	u32 signature /*!  Ths OS library signature used to ensure proper build system is used for applications */;
-	u32 security /*!  Security flags (see \ref sys_security_flags_t)*/;
+	u32 security /*!  Security flags */;
 	u32 cpu_freq /*!  The CPU clock frequency */;
 	u32 sys_mem_size /*!  The number of bytes in RAM shared across OS and other processes */;
 	char stdout_name[LINK_NAME_MAX] /*!  Default value for the standard output */;
@@ -83,7 +93,8 @@ typedef struct MCU_PACK {
 	char bsp_git_hash[16] /*! Git Hash for the board support package */;
 	char sos_git_hash[16] /*! Git Hash for the SOS build */;
 	char mcu_git_hash[16] /*! Git Hash for the linked MCU library */;
-	u32 resd[20];
+	u32 o_mcu_board_config_flags /*! Flags set by mcu board configuration*/;
+	u32 resd[19];
 } sys_info_t;
 
 /*! \details This structure defines the system attributes.
@@ -94,7 +105,7 @@ typedef struct MCU_PACK {
 	char sys_version[8] /*!  The System (board) Version */;
 	char arch[16] /*!  The target architecture (lpc17xx, lpc13xx, etc) */;
 	u32 signature /*!  Ths OS library signature used to ensure proper build system is used for applications */;
-	u32 security /*!  Security flags (see \ref sys_security_flags_t)*/;
+	u32 security /*!  Security flags */;
 	u32 cpu_freq /*!  The CPU clock frequency */;
 	u32 sys_mem_size /*!  The number of bytes in RAM shared across OS and other processes */;
 	char stdout_name[LINK_NAME_MAX] /*!  Default value for the standard output */;
@@ -111,7 +122,7 @@ typedef struct MCU_PACK {
 	char sys_version[8] /*!  The System (board) Version */;
 	char arch[8] /*!  The target architecture (lpc17xx, lpc13xx, etc) */;
 	u32 signature /*!  Ths OS library signature used to ensure proper build system is used for applications */;
-	u32 security /*!  Security flags (see \ref sys_security_flags_t)*/;
+	u32 security /*!  Security flags */;
 	u32 cpu_freq /*!  The CPU clock frequency */;
 	u32 sys_mem_size /*!  The number of bytes in RAM shared across OS and other processes */;
 	char stdout_name[LINK_NAME_MAX] /*!  Default value for the standard output */;
@@ -177,14 +188,6 @@ typedef struct MCU_PACK {
 } sys_process_t;
 
 
-/*! \brief Data structure to unlock the security word features.
- * \details This data structure is used with I_SYS_UNLOCK.  A successful
- * request will unlock the security features (see \a security in \ref sys_info_t) of the device giving access
- * to certain parts of the device.
- */
-typedef struct MCU_PACK {
-	u8 key[32] /*! \brief The password used to unlock the device */;
-} sys_sudo_t;
 
 #define I_SYS_GETVERSION _IOCTL(SYS_IOC_IDENT_CHAR, I_MCU_GETVERSION)
 #define I_SYS_GETINFO _IOCTLR(SYS_IOC_CHAR, I_MCU_GETINFO, sys_info_t)
@@ -236,21 +239,8 @@ typedef struct MCU_PACK {
  */
 #define I_SYS_GETPROCESS _IOCTLRW(SYS_IOC_CHAR, I_MCU_TOTAL+4, sys_process_t)
 
-/*! \brief See below for details
- * \details This request temporarily changes the effective user ID to root.
- * As root certain system functions are available that would not available to
- * the user.  For example, as root, an application can set an interrupt callback
- * that is executed in privileged mode.
- *
- * \code
- * sys_sudo_t passwd;
- * strcpy(passwd.key, "the password");
- * if( ioctl(fd, I_SYS_SUDO, &passwd) < 0 ){
- * 	//failed to accept password
- * }
- * \endcode
- */
-#define I_SYS_SUDO _IOCTLW(SYS_IOC_CHAR, I_MCU_TOTAL+5, sys_sudo_t)
+
+#define I_SYS_SUDO _IOCTLW(SYS_IOC_CHAR, I_MCU_TOTAL+5, sys_auth_t)
 
 /*! \brief See below for details.
  * \details This copies the sos_board_config_t data that is set by the
@@ -262,6 +252,25 @@ typedef struct MCU_PACK {
  *
  */
 #define I_SYS_GETBOARDCONFIG _IOCTLR(SYS_IOC_CHAR, I_MCU_TOTAL+6, sos_board_config_t)
+
+/*! \brief See below for details.
+ * \details This gets the MCU
+ * board configuration data. If
+ * the caller is not privileged,
+ * the secret key information
+ * will be zero'd.
+ *
+ */
+#define I_SYS_GETMCUBOARDCONFIG _IOCTLR(SYS_IOC_CHAR, I_MCU_TOTAL+7, mcu_board_config_t)
+
+
+/*! \brief See below for details.
+ * \details Returns 1 if the caller
+ * has root access. Returns zero otherwise.
+ *
+ */
+#define I_SYS_ISROOT _IOCTL(SYS_IOC_CHAR, I_MCU_TOTAL+8)
+
 
 #define I_SYS_TOTAL 7
 

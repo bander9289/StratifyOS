@@ -22,6 +22,7 @@
 
 #include "mcu/types.h"
 
+#define SCHEDULER_TASK_FLAG_UNBLOCK_MASK 0x0F //bits 0 to 3 are unblock type
 #define SCHEDULER_TASK_FLAG_INUSE 5
 #define SCHEDULER_TASK_FLAG_WAITCHILD 6
 #define SCHEDULER_TASK_FLAG_SIGCAUGHT 7
@@ -29,7 +30,7 @@
 #define SCHEDULER_TASK_FLAG_ZOMBIE 9
 #define SCHEDULER_TASK_FLAG_LISTIOSUSPEND 10
 #define SCHEDULER_TASK_FLAG_ROOT_SYNC 12
-#define SCHEDULER_TASK_FLAG_UNBLOCK_MASK 0x0F
+#define SCHEDULER_TASK_FLAG_AUTHENTICATED 13
 
 typedef enum {
 	SCHEDULER_UNBLOCK_NONE,
@@ -59,7 +60,7 @@ void scheduler_root_deassert_active(int id);
 void scheduler_root_set_trace_id(int tid, trace_id_t id);
 void scheduler_root_assert_sync(void * args) MCU_ROOT_CODE;
 int scheduler_root_unblock_all(void * block_object, int unblock_type);
-void scheduler_root_set_delaymutex(void * args) MCU_ROOT_EXEC_CODE;
+void scheduler_svcall_set_delaymutex(void * args) MCU_ROOT_EXEC_CODE;
 
 void scheduler_root_stop_task(int id);
 void scheulder_root_start_task(int id);

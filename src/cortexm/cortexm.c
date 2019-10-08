@@ -22,6 +22,9 @@
 #include "mcu/core.h"
 #include "cortexm/mpu.h"
 
+//this is used to ensure svcall's execute from start to finish
+cortexm_svcall_t cortexm_svcall_validation MCU_SYS_MEM;
+
 void cortexm_delay_systick(u32 ticks){
 	u32 countdown = ticks;
 	u32 start = cortexm_get_systick_value();
@@ -111,6 +114,10 @@ void cortexm_reset_mode(){
 	cortexm_disable_interrupts();
 	mpu_disable();
 	cortexm_disable_systick_irq();
+	for(s16 i=-14; i < 255; i++){
+		cortexm_disable_irq(i);
+		mcu_core_set_nvic_priority(i, 0);
+	}
 }
 
 void cortexm_set_privileged_mode(){
@@ -152,15 +159,24 @@ void mcu_core_svcall_handler(){
 	asm volatile ("MRS %0, psp\n\t" : "=r" (frame) );
 	call = (cortexm_svcall_t)frame[0];
 	args = (void*)(frame[1]);
-	//verify call is located in kernel text region
+	//verify call is located secure kernel region ROOT_EXEC ONLY
 	if( ((u32)call >= (u32)&_text) && ((u32)call < (u32)&_etext) ){
+		//args must point to kernel RAM or kernel flash -- can't be SYS MEM or registers or anything like that
 		call(args);
 	} else {
 		//this needs to be a fault
 	}
+#if 0
+	//add this when security update is ready
+	if( cortexm_svcall_validation != call ){
+		//this is a security violation
+	}
+	cortexm_svcall_validation = 0;
+#endif
 }
 
 int cortexm_validate_callback(mcu_callback_t callback){
+	// \todo callbacks need to be in ROOT_EXEC_ONLY
 	if( ((u32)callback >= (u32)&_text) && ((u32)callback < (u32)&_etext) ){
 		return 0;
 	}
@@ -187,8 +203,8 @@ void cortexm_enable_interrupts(){
 	asm volatile ("cpsie i");
 }
 
-void cortexm_get_stack_ptr(void * ptr){
-	void ** ptrp = (void**)ptr;
+void cortexm_get_stack_ptr(void ** ptr){
+	void ** ptrp = ptr;
 	void * result=NULL;
 	asm volatile ("MRS %0, msp\n\t" : "=r" (ptr) );
 	*ptrp = result;
@@ -198,8 +214,13 @@ void cortexm_set_stack_ptr(void * ptr){
 	asm volatile ("MSR msp, %0\n\t" : : "r" (ptr) );
 }
 
-void cortexm_get_thread_stack_ptr(void * ptr){
-	void ** ptrp = (void**)ptr;
+void cortexm_svcall_get_thread_stack_ptr(void * ptr){
+	CORTEXM_SVCALL_ENTER();
+	cortexm_get_thread_stack_ptr(ptr);
+}
+
+void cortexm_get_thread_stack_ptr(void ** ptr){
+	void ** ptrp = ptr;
 	void * result=NULL;
 	asm volatile ("MRS %0, psp\n\t" : "=r" (result) );
 	*ptrp = result;

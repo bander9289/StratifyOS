@@ -59,23 +59,59 @@ typedef struct {
     u8 erase_size3;
 } drive_cfi_sfdp_t;
 
-
 typedef struct {
     mcu_event_handler_t handler;
-    drive_cfi_sfdp_t sfdp;
+	 u8 is_initialized;
 } drive_cfi_state_t;
 
 typedef struct {
-    mcu_pin_t cs;
-    const void * mcu_config;
+	u16 addressable_size;
+	u16 write_block_size;
+	u32 num_write_blocks;
+	u32 erase_block_size;
+	u32 erase_block_time;
+	u32 erase_sector_size;
+	u32 erase_sector_time;
+	u32 erase_device_time;
+	u32 bitrate;
+	u32 partition_start;
+} drive_cfi_info_config_t;
+
+typedef struct {
+	u8 write_enable;
+	u8 page_program;
+	u8 block_erase;
+	u8 sector_erase;
+	u8 device_erase;
+	u8 fast_read;
+	u8 power_up;
+	u8 power_down;
+	u8 enable_reset;
+	u8 reset;
+	u8 protect;
+	u8 unprotect;
+	u8 read_busy_status;
+	u8 write_status;
+	u8 initial_status_value;
+	u8 busy_status_mask;
+	u8 enter_qpi_mode;
+	u8 enter_4byte_address_mode;
+	u16 page_program_size;
+	u8 read_dummy_cycles;
+	u8 write_dummy_cycles;
+} drive_cfi_opcode_config_t;
+
+typedef struct {
+	const devfs_device_t * serial_device;
+	drive_cfi_info_config_t info;
+	drive_cfi_opcode_config_t opcode;
+	mcu_pin_t cs;
+	u32 qspi_flags;
 } drive_cfi_config_t;
 
 
-DEVFS_DRIVER_DECLARTION(cfi_spi);
-DEVFS_DRIVER_DECLARTION(cfi_spi_dma);
-DEVFS_DRIVER_DECLARTION(cfi_qspi);
-DEVFS_DRIVER_DECLARTION(cfi_qspi_dma);
-
+DEVFS_DRIVER_DECLARTION(drive_cfi_spi);
+DEVFS_DRIVER_DECLARTION(drive_cfi_qspi);
 
 
 #endif /* DEVICE_CFI_H_ */

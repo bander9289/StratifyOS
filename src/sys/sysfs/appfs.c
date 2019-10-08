@@ -42,8 +42,10 @@
 #define ANALYZE_PATH_RAM 4
 #define ANALYZE_PATH_RAM_DIR 5
 
-static void root_ioctl(void * args);
-static void root_init(void * args);
+static void svcall_ioctl(void * args);
+static void svcall_init(void * args);
+static void svcall_read(void * args);
+static void svcall_close(void * args);
 static int readdir_rootdir(const void * cfg, int loc, struct dirent * entry);
 
 static int analyze_path(const char * path, const char ** name, int * mem_type){
@@ -107,7 +109,8 @@ static bool is_sys(const char * name){
 }
 
 
-void root_init(void * args){
+void svcall_init(void * args){
+	CORTEXM_SVCALL_ENTER();
 	int i;
 	mem_info_t info;
 	appfs_file_t appfs_file;
@@ -155,7 +158,7 @@ void root_init(void * args){
 
 //called unpriv for mounting
 int appfs_init(const void * cfg){
-	cortexm_svcall(root_init, (void*)cfg);
+	cortexm_svcall(svcall_init, (void*)cfg);
 	return 0;
 }
 
@@ -188,16 +191,22 @@ int appfs_startup(const void * cfg){
 			 (get_fileinfo_args.file_info.exec.o_flags & APPFS_FLAG_IS_STARTUP) ){
 
 			//start the process
-			mem.code.addr = (void*)get_fileinfo_args.file_info.exec.code_start;
+			mem.code.address = (void*)get_fileinfo_args.file_info.exec.code_start;
 			mem.code.size = get_fileinfo_args.file_info.exec.code_size;
-			mem.data.addr = (void*)get_fileinfo_args.file_info.exec.ram_start;
+			mem.data.address = (void*)get_fileinfo_args.file_info.exec.ram_start;
 			mem.data.size = get_fileinfo_args.file_info.exec.ram_size;
+			int is_root = 0;
+
+			if( get_fileinfo_args.file_info.exec.o_flags & APPFS_FLAG_IS_ROOT ){
+				is_root = 1;
+			}
 
 			if ( scheduler_create_process((void*)get_fileinfo_args.file_info.exec.startup,
 													0,
 													&mem,
 													(void*)get_fileinfo_args.file_info.exec.ram_start,
-													0) >= 0 ){
+													0,
+													is_root) >= 0 ){
 				started++;
 				mcu_debug_log_info(MCU_DEBUG_APPFS, "Started %s", get_fileinfo_args.file_info.hdr.name);
 			} else {
@@ -273,7 +282,7 @@ int appfs_open(const void * cfg, void ** handle, const char * path, int flags, i
 		}
 	}
 
-	if ( ret == -1 ){
+	if ( ret < 0 ){
 		free(h);
 		h = NULL;
 	}
@@ -346,8 +355,14 @@ int appfs_unlink(const void* cfg, const char * path){
 
 
 	} else {
+		u32 rasr, rbar;
 		ram.page = get_pageinfo_args.page_info.num;
-		ram.size = file_info.exec.code_size + file_info.exec.data_size;
+
+		//the actual amount is not stored anywhere so it needs to be calculated again using the MPU
+		ram.size = mpu_calc_region(0,
+											(void*)get_pageinfo_args.page_info.addr,
+											file_info.exec.code_size + file_info.exec.data_size,
+											0, 0, 0, &rbar, &rasr);
 		//The Ram size is the code size + the data size round up to the next power of 2 to account for memory protection
 		cortexm_svcall(appfs_ram_svcall_set, &ram);
 	}
@@ -363,6 +378,7 @@ int appfs_unlink(const void* cfg, const char * path){
 		get_pageinfo_args.page_info.addr = file_info.exec.ram_start;
 		get_pageinfo_args.page_info.o_flags = MEM_FLAG_IS_QUERY;
 
+		//use query to get the page number of the address
 		cortexm_svcall(appfs_util_svcall_get_pageinfo, &get_pageinfo_args);
 		if ( get_pageinfo_args.result < 0 ){
 			return SYSFS_SET_RETURN(EIO);
@@ -377,7 +393,11 @@ int appfs_unlink(const void* cfg, const char * path){
 }
 
 
-int appfs_fstat(const void* cfg, void * handle, struct stat * st){
+int appfs_fstat(
+		const void* cfg,
+		void * handle,
+		struct stat * st
+		){
 	appfs_handle_t * h = handle;
 	const devfs_device_t * device = cfg;
 
@@ -394,10 +414,16 @@ int appfs_fstat(const void* cfg, void * handle, struct stat * st){
 	get_fileinfo_args.device = device;
 	get_fileinfo_args.page = h->type.reg.page;
 	get_fileinfo_args.type = h->type.reg.o_flags;
-	cortexm_svcall(appfs_util_svcall_get_fileinfo, &get_fileinfo_args);
+	cortexm_svcall(
+				appfs_util_svcall_get_fileinfo,
+				&get_fileinfo_args
+				);
 
-	if( get_fileinfo_args.result < 0 ){ return -1; }
+	if( get_fileinfo_args.result < 0 ){
+		return SYSFS_SET_RETURN(EIO);
+	}
 
+	st->st_dev = h->type.reg.o_flags;
 	st->st_ino = h->type.reg.page;
 	st->st_blksize = MCU_RAM_PAGE_SIZE;
 	if( get_fileinfo_args.file_info.hdr.mode == 0444 ){ //this is a read only data file -- peel off the header from the size
@@ -422,7 +448,11 @@ int appfs_stat(const void* cfg, const char * path, struct stat * st){
 	appfs_file_t file_info;
 	mem_pageinfo_t page_info;
 
-	if ( (path_type = analyze_path(path, &name, &mem_type)) < 0 ){
+	if ( (path_type = analyze_path(
+				path,
+				&name,
+				&mem_type
+				)) < 0 ){
 		return SYSFS_SET_RETURN(ENOENT);
 	}
 
@@ -476,15 +506,22 @@ int appfs_stat(const void* cfg, const char * path, struct stat * st){
 	return appfs_fstat(cfg, &handle, st);
 }
 
-void root_read(void * args){
-	sysfs_read_t * p = args;
-
+void svcall_read(void * args){
+	CORTEXM_SVCALL_ENTER();
+	sysfs_read_t * p;
 	devfs_async_t async;
 	const devfs_device_t * dev;
 	appfs_handle_t * h;
 
+	//validate args?
+	p = args;
 	h = p->handle;
 	dev = p->config;
+
+	if( sysfs_is_r_ok(dev->mode, dev->uid, SYSFS_GROUP) == 0 ){
+		p->result = SYSFS_SET_RETURN(EPERM);
+		return;
+	}
 
 	memset(&async, 0, sizeof(async));
 	async.tid = task_get_current();
@@ -493,7 +530,13 @@ void root_read(void * args){
 	async.flags = p->flags;
 	async.loc = p->loc;
 
-	if( h->type.reg.mode == 0444 ){
+	//destination memory must be with accessible program
+	if( task_validate_memory(async.buf, async.nbyte) < 0 ){
+		p->result = SYSFS_SET_RETURN(EPERM);
+	}
+
+	//the header is not part of the file for non-execs
+	if( (h->type.reg.mode & 0111) == 0 ){
 		async.loc += sizeof(appfs_file_t);
 	}
 
@@ -519,7 +562,7 @@ int appfs_read(const void * cfg, void * handle, int flags, int loc, void * buf, 
 	args.loc = loc;
 	args.buf = buf;
 	args.nbyte = nbyte;
-	cortexm_svcall(root_read, &args);
+	cortexm_svcall(svcall_read, &args);
 	return args.result;
 
 }
@@ -528,10 +571,27 @@ int appfs_write(const void * cfg, void * handle, int flags, int loc, const void 
 	return SYSFS_SET_RETURN(EROFS);
 }
 
+void svcall_close(void * args){
+	CORTEXM_SVCALL_ENTER();
+	//flash may not be synced with memory because of programming ops
+	mcu_core_invalidate_instruction_cache();
+
+	appfs_handle_t * h = args;
+	mcu_core_clean_data_cache_block(
+				(void*)h->type.install.code_start, h->type.install.code_size
+				);
+
+	mcu_core_clean_data_cache_block(
+				(void*)h->type.install.data_start, h->type.install.data_size
+				);
+}
 
 int appfs_close(const void* cfg, void ** handle){
 	//close a file
 	appfs_handle_t * h = (appfs_handle_t*)*handle;
+	if( h->is_install ){
+		cortexm_svcall(svcall_close, h);
+	}
 	free(h);
 	h = NULL;
 	return 0;
@@ -552,18 +612,26 @@ int appfs_opendir(const void* cfg, void ** handle, const char * path){
 
 
 
-void root_ioctl(void * args){
+void svcall_ioctl(void * args){
+	CORTEXM_SVCALL_ENTER();
 	sysfs_ioctl_t * a = args;
 	appfs_handle_t * h = a->handle;
 	int request = a->request;
 	appfs_installattr_t * attr;
 	const appfs_file_t * f;
+	const devfs_device_t * dev = a->cfg;
 
 	appfs_info_t * info;
 	void * ctl = a->ctl;
 	a->result = -1;
 
 	mcu_wdt_reset();
+
+	//check permissions on this device - IOCTL needs read/write access
+	if( sysfs_is_rw_ok(dev->mode, dev->uid, SYSFS_GROUP) == 0 ){
+		a->result = SYSFS_SET_RETURN(EPERM);
+		return;
+	}
 
 	info = ctl;
 	attr = ctl;
@@ -584,14 +652,13 @@ void root_ioctl(void * args){
 				a->result = SYSFS_SET_RETURN(ENOTSUP);
 			} else {
 				a->result = appfs_util_root_create(a->cfg, h, attr);
-				mcu_core_invalidate_data_cache();
 			}
 			break;
 
 			//These calls work with the specific applications
 		case I_APPFS_FREE_RAM:
 			if( h->is_install ){
-				a->result = SYSFS_SET_RETURN(ENOTSUP);
+				a->result = SYSFS_SET_RETURN(ENOSYS);
 			} else {
 				a->result =  appfs_util_root_free_ram(a->cfg, h);
 			}
@@ -599,7 +666,7 @@ void root_ioctl(void * args){
 
 		case I_APPFS_RECLAIM_RAM:
 			if( h->is_install ){
-				a->result = SYSFS_SET_RETURN(ENOTSUP);
+				a->result = SYSFS_SET_RETURN(ENOSYS);
 			} else {
 				a->result = appfs_util_root_reclaim_ram(a->cfg, h);
 			}
@@ -607,8 +674,10 @@ void root_ioctl(void * args){
 
 		case I_APPFS_GETINFO:
 			if( h->is_install ){
-				a->result = SYSFS_SET_RETURN(ENOTSUP);
+				a->result = SYSFS_SET_RETURN(ENOSYS);
 			} else {
+				//this works for applications
+				//what about data and system files
 				f = appfs_util_getfile(h);
 				info->mode = f->hdr.mode;
 				info->o_flags = f->exec.o_flags;
@@ -625,7 +694,6 @@ void root_ioctl(void * args){
 			a->result = SYSFS_SET_RETURN(EINVAL);
 			break;
 	}
-
 }
 
 int appfs_ioctl(const void * cfg, void * handle, int request, void * ctl){
@@ -634,7 +702,7 @@ int appfs_ioctl(const void * cfg, void * handle, int request, void * ctl){
 	args.handle = handle;
 	args.request = request;
 	args.ctl = ctl;
-	cortexm_svcall(root_ioctl, &args);
+	cortexm_svcall(svcall_ioctl, &args);
 	return args.result;
 
 }

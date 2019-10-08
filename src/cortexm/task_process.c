@@ -37,7 +37,7 @@ int task_create_process(void (*p)(char*),
 	static int task_process_counter = 1;
 
 	//Variable initialization
-	stackaddr = mem->data.addr + mem->data.size;
+	stackaddr = mem->data.address + mem->data.size;
 
 	//Check the stack alignment
 	if ( (unsigned int)stackaddr & 0x03 ){
@@ -69,7 +69,7 @@ int task_create_process(void (*p)(char*),
 	task.mem = &task_memories;
 
 	//Do a priv call while accessing the task table so there are no interruptions
-	cortexm_svcall( (cortexm_svcall_t)task_root_new_task, &task);
+	cortexm_svcall( (cortexm_svcall_t)task_svcall_new_task, &task);
 	tid = task.tid;
 	return tid;
 }

@@ -36,6 +36,7 @@ typedef struct {
 typedef struct {
     stream_ffifo_channel_state_t rx;
     stream_ffifo_channel_state_t tx;
+	 u32 o_flags;
 } stream_ffifo_state_t;
 
 typedef struct {
@@ -95,7 +96,7 @@ int stream_ffifo_close(const devfs_handle_t * handle);
     .device = device_value, \
     .rx_loc = rx_loc_value, \
     .tx_loc = tx_loc_value, \
-    .rx = { .frame_count = count_value, .frame_size = frame_size_value, .buffer = name##_rx_buffer } \
+	 .rx = { .frame_count = count_value, .frame_size = frame_size_value, .buffer = name##_rx_buffer }, \
     .tx = { .frame_count = count_value, .frame_size = frame_size_value, .buffer = name##_tx_buffer } \
     }
 

@@ -125,6 +125,4 @@ typedef struct {
 
 
 
-
-
 #endif /* POSIX_SYS_SOCKET_H_ */

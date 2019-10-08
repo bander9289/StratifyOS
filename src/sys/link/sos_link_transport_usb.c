@@ -44,6 +44,8 @@ const usbfifo_config_t sos_link_transport_usb_fifo_cfg = {
 		.size = USB0_DEVFIFO_BUFFER_SIZE
 	}
 };
+
+
 usbfifo_state_t sos_link_transport_usb_fifo_state MCU_SYS_MEM;
 
 static int open_pio(mcu_pin_t pin, int active_high){
@@ -123,7 +125,7 @@ link_transport_phy_t sos_link_transport_usb_open(const char * name,
 
 	mcu_debug_log_info(MCU_DEBUG_USB | MCU_DEBUG_LINK, "USB Dev Init");
 	//initialize USB device
-	cortexm_svcall(usbd_control_root_init, context);
+	cortexm_svcall(usbd_control_svcall_init, context);
 
 	if( pio_fd >= 0 ){
 		if( usb_up_active_high ){

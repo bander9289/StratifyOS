@@ -444,6 +444,7 @@ int unmount(const char * path);
  * @param options Install options mask (flash, startup, etc)
  * @param ram_size The amount of RAM that will be allocated to stack/heap (excludes code even if running from RAM), set to zero for default RAM size
  * @param update_progress Callback to show progress of install/launch
+ * @param update_context Value passed to update_progress() callback
  * @param envp Null for this version
  * @return Zero on success
  */
@@ -465,6 +466,7 @@ int launch(const char * path,
  * @param options Install options
  * @param ram_size The number of bytes to use for heap/stack
  * @param update_progress Callback to show progress of the install
+ * @param update_context Value passed to update_progress() callback
  * @return Zero on success
  */
 int install(const char * path,
@@ -506,12 +508,11 @@ int kernel_request(int request, void * data) MCU_WEAK;
 const void * kernel_request_api(u32 request) MCU_WEAK;
 
 typedef struct {
-	//bool logged;
-	uint32_t tid;
-	uint32_t pid;
+	u32 tid;
+	s32 free_stack_size;
+	s32 free_heap_size;
+	u32 pid;
 	fault_t fault;
-	//time_t time;
-	//unsigned int useconds;
 } scheduler_fault_t;
 
 #define SOS_TRACE_MESSAGE(msg) sos_trace_event(LINK_POSIX_TRACE_MESSAGE, msg, strnlen(msg, LINK_POSIX_TRACE_DATA_SIZE))
@@ -593,9 +594,13 @@ extern const sos_board_config_t sos_board_config;
 #define SOS_USER 1
 
 void sos_led_startup();
-void sos_led_root_enable(void * args);
-void sos_led_root_disable(void * args);
-void sos_led_root_error(void * args);
+void sos_led_svcall_enable(void * args);
+void sos_led_svcall_disable(void * args);
+void sos_led_svcall_error(void * args);
+
+void sos_led_root_enable();
+void sos_led_root_disable();
+void sos_led_root_error();
 
 #endif
 
