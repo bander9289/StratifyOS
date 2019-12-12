@@ -138,12 +138,14 @@ int mcu_debug_printf(const char * format, ...){
 	return mcu_debug_vprintf(format, args);
 }
 
+
+
 int mcu_debug_vprintf(const char * format, va_list args){
 	mcu_debug_buffer_t svcall_args;
 	svcall_args.buffer[255] = 0;
 	svcall_args.len = vsnprintf(svcall_args.buffer, 255, format, args);
 	if( cortexm_is_root_mode() ){
-		mcu_debug_svcall_write_uart(&svcall_args);
+		mcu_debug_root_write_uart(svcall_args.buffer, svcall_args.len);
 	} else {
 		cortexm_svcall(mcu_debug_svcall_write_uart, &svcall_args);
 	}

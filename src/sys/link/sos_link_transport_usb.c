@@ -34,7 +34,7 @@ limitations under the License.
 
 #define USB0_DEVFIFO_BUFFER_SIZE 64
 static char usb0_fifo_buffer[USB0_DEVFIFO_BUFFER_SIZE] MCU_SYS_MEM;
-static char usb0_read_buffer[SOS_LINK_TRANSPORT_USB_BULK_ENDPOINT_SIZE] MCU_SYS_MEM;
+static char usb0_read_buffer[SOS_LINK_TRANSPORT_USB_BULK_ENDPOINT_SIZE] MCU_ALIGN(32);
 const usbfifo_config_t sos_link_transport_usb_fifo_cfg = {
 	.endpoint = SOS_LINK_TRANSPORT_USB_BULK_ENDPOINT,
 	.endpoint_size = SOS_LINK_TRANSPORT_USB_BULK_ENDPOINT_SIZE,
@@ -142,12 +142,14 @@ link_transport_phy_t sos_link_transport_usb_open(const char * name,
 int sos_link_transport_usb_write(link_transport_phy_t handle, const void * buf, int nbyte){
 	int ret;
 	ret = write(handle, buf, nbyte);
+	//mcu_debug_printf("%d bytes written\n", ret);
 	return ret;
 }
 
 int sos_link_transport_usb_read(link_transport_phy_t handle, void * buf, int nbyte){
 	int ret;
 	ret = read(handle, buf, nbyte);
+	//mcu_debug_printf("%d bytes arrived\n", ret);
 	return ret;
 }
 
