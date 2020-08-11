@@ -51,7 +51,7 @@ int mcu_can_ioctl(const devfs_handle_t * handle, int request, void * ctl) MCU_RO
 int mcu_can_close(const devfs_handle_t * handle) MCU_ROOT_CODE;
 
 int mcu_can_addfilter(const devfs_handle_t * handle, void * ctl);
-int mcu_can_removefilter(const devfs_handle_t * handle, void * ctl);
+int mcu_can_removefilter(const devfs_handle_t * handle, int channel);
 
 int mcu_can_getinfo(const devfs_handle_t * handle, void * ctl) MCU_ROOT_CODE;
 int mcu_can_setaction(const devfs_handle_t * handle, void * ctl) MCU_ROOT_CODE;
