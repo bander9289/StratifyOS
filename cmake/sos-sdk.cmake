@@ -1,16 +1,7 @@
 
-if( ${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows" )
-	set(CMAKE_MAKE_PROGRAM "C:/StratifyLabs-SDK/Tools/gcc/bin/make.exe" CACHE INTERNAL "Mingw generator" FORCE)
-endif()
-
-
 if( ${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Darwin" )
 	set(SOS_SDK_EXEC_SUFFIX "")
 	set(SOS_SDK_GENERATOR "")
-elseif( ${CMAKE_HOST_SYSTEM_NAME} STREQUAL "Windows" )
-	set(SOS_SDK_PATH_TO_MAKE "C:/StratifyLabs-SDK/Tools/gcc/bin")
-	set(SOS_SDK_GENERATOR -G "MinGW Makefiles")
-	set(SOS_SDK_EXEC_SUFFIX ".exe")
 endif()
 
 if( SOS_SDK_PATH_TO_CMAKE )
