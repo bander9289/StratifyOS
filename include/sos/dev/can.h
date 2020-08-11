@@ -33,13 +33,13 @@ typedef struct MCU_PACK {
 	u32 o_events /*! Events supported by this driver */;
 } can_info_t;
 
-typedef struct
+typedef struct MCU_PACK
 {
 	uint32_t rx_id;
 	uint32_t rx_mask;
 } can_rxfilter_attr_t;
 
-typedef struct
+typedef struct MCU_PACK
 {
   uint32_t baudRate;
   bool bLoopBack;
